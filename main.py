@@ -50,6 +50,17 @@ class TFIDF_Engine:
             to counts) attributes, appends each document object to self.documents. Sets self.N to the number
             of documents that it read in. 
         """
+        for filename in os.listdir(self.corpus_location):
+            filepath = os.path.join(self.corpus_location, filename)
+            if os.path.isfile(filepath):
+                with open(filepath, 'r') as file:
+                    text = file.read()
+                    doc = Document()
+                    doc.text = text
+                    doc.terms = self.tokenize(
+                        text)  # Assuming tokenize is a method of TFIDF_Engine or a standalone function
+                    self.documents.append(doc)
+        self.N = len(self.documents)
         # TODO
         pass
 
@@ -61,6 +72,14 @@ class TFIDF_Engine:
             Creates self.term_vector_words which holds the order of words for the document
             vector, to be used later. Any order is fine, but once set, should not be changed.
         """
+        all_terms = set()
+        for doc in self.documents:
+            for term in doc.terms:
+                all_terms.add(term)
+                self.df_table[term] = self.df_table.get(term, 0) + 1
+
+        self.term_vector_words = list(all_terms)
+
         # TODO 
         pass
 
@@ -73,12 +92,24 @@ class TFIDF_Engine:
 
             Args: a document, d - this could be a document from the corpus or a document representing a query
         """
+        term_vector = []
+        for term in self.term_vector_words:
+            if term in d.terms:
+                tf = d.terms[term] / sum(d.terms.values())
+                idf = math.log(self.N / self.df_table.get(term, 1))  # Adding 1 to avoid division by zero
+                term_vector.append(tf * idf)
+            else:
+                term_vector.append(0)
+
+        d.term_vector = term_vector
         # TODO 
         pass 
 
     def create_term_vectors(self):
         """Creates a term_vector for each document, utilizing self.create_term_vector.
         """
+        for doc in self.documents:
+            self.create_term_vector(doc)
         # TODO
         pass
 
@@ -92,7 +123,19 @@ class TFIDF_Engine:
             Returns:
                 the dot product of the term vectors of the input documents
         """
-        # TODO
+        # Calculating the dot product of the term vectors
+        dot_product = sum(a * b for a, b in zip(d1.term_vector, d2.term_vector))
+
+        # Calculating the magnitude of each term vector
+        magnitude_d1 = math.sqrt(sum(a ** 2 for a in d1.term_vector))
+        magnitude_d2 = math.sqrt(sum(b ** 2 for b in d2.term_vector))
+
+        # Handling the case where the magnitude of either vector is zero
+        if magnitude_d1 == 0 or magnitude_d2 == 0:
+            return 0
+
+        # Calculating and returning the cosine similarity
+        return dot_product / (magnitude_d1 * magnitude_d2)
         pass
 
     def get_results(self, query: str) -> List[Tuple[float, int]]:
@@ -105,7 +148,23 @@ class TFIDF_Engine:
             similarity score, that is, the highest similarity score adn corresponding index will be
             first in the list.
         """
-        # TODO 
+        # Creating a document for the query
+        query_doc = Document()
+        query_doc.text = query
+        query_doc.terms = self.tokenize(query)  # Assuming tokenize is a method of TFIDF_Engine or a standalone function
+        self.create_term_vector(query_doc)
+
+        # Calculating similarity scores
+        results = []
+        for index, doc in enumerate(self.documents):
+            sim_score = self.calculate_cosine_sim(query_doc, doc)
+            results.append((sim_score, index))
+
+        # Sorting the results in descending order of similarity score
+        results.sort(key=lambda x: x[0], reverse=True)
+
+        return results
+
         pass
                 
 
@@ -208,12 +267,12 @@ if __name__ == "__main__":
 
     
     #tests for get_results
-    # assert t.get_results("star wars")[0][1] == 111, "get_results test 1"
+    assert t.get_results("star wars")[0][1] == 111, "get_results test 1"
     assert "Lucas announces new 'Star Wars' title" in t.documents[t.get_results("star wars")[0][1]].text, "get_results test 1"
-    # assert t.get_results("movie trek george lucas")[2][1] == 24, "get_results test 2"
+    assert t.get_results("movie trek george lucas")[2][1] == 24, "get_results test 2"
     assert "Stars of 'X-Men' film are hyped, happy, as comic heroes" in t.documents[t.get_results("movie trek george lucas")[2][1]].text 
     assert len(t.get_results("star trek")) == len(t.documents), "get_results test 3"
 
-    # t.query_loop() #uncomment this line to try out the search engine
+    t.query_loop() #uncomment this line to try out the search engine
 
     
